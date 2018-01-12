@@ -67,11 +67,11 @@ template< typename I> int average(I input[], int n, int taps, bool dir) {
   return (int)output / taps;
 }
 
-int formatData(int data){
-  if(data < 10){
+int formatData(int data) {
+  if (data < 10) {
     return 1000;
   }
-  if(data > 1000){
+  if (data > 1000) {
     return 1000;
   }
   return data;
@@ -85,23 +85,25 @@ int formatData(int data){
 #define TRIG_PIN_1 12
 #define ECHO_PIN_1 13
 // Sonar 2
-#define TRIG_PIN_2 12
-#define ECHO_PIN_2 13
+#define TRIG_PIN_2 10
+#define ECHO_PIN_2 11
 // PID
 #define POT1 A0
 #define POT2 A1
-#define MOTOR1 5
-#define MOTOR2 6
+#define MOTOR1 8
+#define MOTOR2 9
 // array information
-#define araryNum 4
+#define araryNum 50
+#define averageAmount 20
+#define DELAYMAX 50
 // Ultrasonic Sensors
 HCSR04 RawA(TRIG_PIN_1, ECHO_PIN_1, 20, 1000);
-HCSR04 RawB(TRIG_PIN_2, ECHO_PIN_1, 20, 1000);
+HCSR04 RawB(TRIG_PIN_2, ECHO_PIN_2, 20, 1000);
 
-int valuesA[] = {1000, 1000, 1000, 1000};
-int valuesB[] = {1000, 1000, 1000, 1000};
-int valuesC[] = {1000, 1000, 1000, 1000};
-int valuesD[] = {1000, 1000, 1000, 1000};
+int valuesA[araryNum];
+int valuesB[araryNum];
+int valuesC[araryNum];
+int valuesD[araryNum];
 bool SensorA = false;
 bool SensorB = false;
 bool SensorC = false;
@@ -112,82 +114,92 @@ double SetpointY, InputY, OutputY;
 double Kp = 0.1, Ki = 5, Kd = 0;
 PID pidx(&InputX, &OutputX, &SetpointX, Kp, Ki, Kd, DIRECT);
 PID pidy(&InputY, &OutputY, &SetpointY, Kp, Ki, Kd, DIRECT);
-int valuesPot1[] = {1000, 1000, 1000, 1000};
-int valuesPot2[] = {1000, 1000, 1000, 1000};
+int valuesPot1[araryNum] ;
+int valuesPot2[araryNum] ;
+int sensors[] = {0, 0, 0, 0};
 
 int StateNumber = 1;
 int timeout = 0;
 int timeout_amount = 5000;
 int offset1 = 0;
 int offset2 = 0;
+int delaynum = 0;
+
 
 Servo motorx;
 Servo motory;
 
 String inputString  = "";
 void setup() {
+  for(int i = 0; i<10;i++){
+    pinMode(i,OUTPUT);
+  }
+  
   Serial.begin(9600);
+  changeState(1);
   motorx.attach(MOTOR1);
   motory.attach(MOTOR2);
   pidx.SetMode(AUTOMATIC);
   pidy.SetMode(AUTOMATIC);
   pidx.SetOutputLimits(0, 180);
   pidy.SetOutputLimits(0, 180);
+  Serial.println("SETUP IS DONE");
 }
 
 void loop() {
   roll(valuesA, valuesA, araryNum, false);
   valuesA[araryNum - 1] = formatData(RawA.distanceInMillimeters());
+  delay(50);
   roll(valuesB, valuesB, araryNum, false);
-  valuesB[araryNum - 1] = RawB.distanceInMillimeters();
+  valuesB[araryNum - 1] = formatData(RawB.distanceInMillimeters());
+  delay(50);
   roll(valuesPot1, valuesPot1, araryNum, false);
-  valuesPot1[araryNum - 1] = map(analogRead(POT1)+offset1, 0, 1023, 0, 100);
+  valuesPot1[araryNum - 1] = map(analogRead(POT1) + offset1, 0, 1023, 0, 100);
   roll(valuesPot2, valuesPot2, araryNum, false);
-  valuesPot2[araryNum - 1] = map(analogRead(POT2)+offset2, 0, 1023, 0, 100);
+  valuesPot2[araryNum - 1] = map(analogRead(POT2) + offset2, 0, 1023, 0, 100);
 
   InputX = average(valuesPot1, araryNum, 3, false);
   InputY = average(valuesPot2, araryNum, 3, false);
   
-  SensorA = (average(valuesA, araryNum, 3, false) < 40) ? true : false;
-  SensorB = (average(valuesB, araryNum, 3, false) < 40) ? true : false;
-  SensorC = (average(valuesC, araryNum, 3, false) < 40) ? true : false;
-  SensorD = (average(valuesD, araryNum, 3, false) < 40) ? true : false;
-
-
+  SensorA = (average(valuesA, araryNum, averageAmount, true) < 40) ? true : false;
+  SensorB = (average(valuesB, araryNum, averageAmount, true) < 40) ? true : false;
+  SensorC = (average(valuesC, araryNum, averageAmount, true) < 40) ? true : false;
+  SensorD = (average(valuesD, araryNum, averageAmount, true) < 40) ? true : false;
+  sensors[0] = average(valuesA, araryNum, averageAmount, true);
+  sensors[1] = average(valuesB, araryNum, averageAmount, true);
+  sensors[2] = average(valuesC, araryNum, averageAmount, true);
+  sensors[3] = average(valuesD, araryNum, averageAmount, true);
+  Print(sensors, 4);
+  Serial.print(" ");
   switch (StateNumber) {
+    case 0:
     case 1:
       Serial.println("State 1");
       SetpointX = 50;
       SetpointY = 50;
       if (SensorA) {
-        StateNumber = 2;
+        changeState(2);
       }
       if (SensorB) {
-        StateNumber = 5;
+        changeState(5);
       }
       if (SensorC) {
-        StateNumber = 8;
-        timeout = 0;
+        changeState(8);
       }
       if (SensorD) {
-        StateNumber = 11;
+        changeState(11);
       }
       break;
     case 2:
       Serial.println("State 2");
       SetpointX = 75;
       SetpointY = 25;
-      if (timeout > timeout_amount) {
-        StateNumber = 1;
-        timeout = 0;
-      }
+      if (timeout > timeout_amount) {changeState(1);}
       if (SensorA) {
-        StateNumber = 3;
-        timeout = 0;
+        changeState(3);
       }
       if (SensorC) {
-        StateNumber = 4;
-        timeout = 0;
+        changeState(4);
       }
       // timeout
       // state 3
@@ -198,8 +210,7 @@ void loop() {
       SetpointX = 100;
       SetpointY = 25;
       if (timeout > timeout_amount) {
-        StateNumber = 1;
-        timeout = 0;
+        changeState(1);
       }
       // timeout
       break;
@@ -208,8 +219,7 @@ void loop() {
       SetpointX = 75;
       SetpointY = 0;
       if (timeout > timeout_amount) {
-        StateNumber = 1;
-        timeout = 0;
+        changeState(1);
       }
       // timeout
       break;
@@ -218,16 +228,13 @@ void loop() {
       SetpointX = 25;
       SetpointY = 75;
       if (timeout > timeout_amount) {
-        StateNumber = 1;
-        timeout = 0;
+        changeState(1);
       }
       if (SensorD) {
-        StateNumber = 6;
-        timeout = 0;
+        changeState(6);
       }
       if (SensorB) {
-        StateNumber = 7;
-        timeout = 0;
+        changeState(7);
       }
       // timeout
       // state 6
@@ -238,8 +245,7 @@ void loop() {
       SetpointX = 25;
       SetpointY = 100;
       if (timeout > timeout_amount) {
-        StateNumber = 1;
-        timeout = 0;
+        changeState(1);
       }
       // timeout
       break;
@@ -248,8 +254,7 @@ void loop() {
       SetpointX = 0;
       SetpointY = 75;
       if (timeout > timeout_amount) {
-        StateNumber = 1;
-        timeout = 0;
+        changeState(1);
       }
       // timeout
       break;
@@ -258,16 +263,13 @@ void loop() {
       SetpointX = 75;
       SetpointY = 25;
       if (timeout > timeout_amount) {
-        StateNumber = 1;
-        timeout = 0;
+        changeState(1);
       }
       if (SensorA) {
-        StateNumber = 9;
-        timeout = 0;
+        changeState(9);
       }
       if (SensorC) {
-        StateNumber = 10;
-        timeout = 0;
+        changeState(10);
       }
       // timeout
       // state 9
@@ -278,8 +280,7 @@ void loop() {
       SetpointX = 100;
       SetpointY = 25;
       if (timeout > timeout_amount) {
-        StateNumber = 1;
-        timeout = 0;
+        changeState(1);
       }
       // timeout
       break;
@@ -288,8 +289,7 @@ void loop() {
       SetpointX = 75;
       SetpointY = 0;
       if (timeout > timeout_amount) {
-        StateNumber = 1;
-        timeout = 0;
+        changeState(1);
       }
       // timeout
       break;
@@ -298,16 +298,13 @@ void loop() {
       SetpointX = 25;
       SetpointY = 75;
       if (timeout > timeout_amount) {
-        StateNumber = 1;
-        timeout = 0;
+        changeState(1);
       }
       if (SensorB) {
-        StateNumber = 12;
-        timeout = 0;
+        changeState(12);
       }
       if (SensorD) {
-        StateNumber = 13;
-        timeout = 0;
+        changeState(13);
       }
       // timeout
       // state 12
@@ -318,8 +315,7 @@ void loop() {
       SetpointX = 0;
       SetpointY = 75;
       if (timeout > timeout_amount) {
-        StateNumber = 1;
-        timeout = 0;
+        changeState(1);
       }
       // timeout
       break;
@@ -328,17 +324,19 @@ void loop() {
       SetpointX = 25;
       SetpointY = 100;
       if (timeout > timeout_amount) {
-        StateNumber = 1;
-        timeout = 0;
+        changeState(1);
       }
       // timeouts
       break;
+    default:
+      Serial.println("IN THE DEFAULT CASE");
 
   };
   pidx.Compute();
   pidy.Compute();
   motorx.write(OutputX);
   motory.write(OutputY);
+  timeout += 100;
 
 }
 void serialEvent() {
@@ -356,10 +354,10 @@ void serialEvent() {
     roll(valuesD, valuesD, araryNum, false);
     valuesD[araryNum - 1] = inputString.toInt();
   }
-  if(first =="Q"){
+  if (first == "Q") {
     offset1 = inputString.toInt();
   }
-  if(first =="W"){
+  if (first == "W") {
     offset2 = inputString.toInt();
   }
 }
@@ -373,5 +371,17 @@ void wholeThing() {
     // add it to the inputString:
     inputString += inChar;
   }
+}
+
+void changeState(int newState) {
+  StateNumber = newState;
+  timeout = 0;
+  for (int i = 0; i < araryNum; i++) {
+    valuesA[i] = 1000;
+    valuesB[i] = 1000;
+    valuesC[i] = 1000;
+    valuesD[i] = 1000;
+  }
+
 }
 
