@@ -100,6 +100,7 @@ int formatData(int data) {
 #define BUTTONB 5
 #define BUTTONC 6
 #define BUTTOND 7
+#define LED 3
 // Ultrasonic Sensors
 HCSR04 RawA(TRIG_PIN_1, ECHO_PIN_1, 20, 1000);
 HCSR04 RawB(TRIG_PIN_2, ECHO_PIN_2, 20, 1000);
@@ -115,7 +116,7 @@ bool SensorD = false;
 
 double SetpointX, InputX, OutputX;
 double SetpointY, InputY, OutputY;
-double Kp = 0.1, Ki = 5, Kd = 0;
+double Kp = 1.1, Ki = 5, Kd = 0;
 PID pidx(&InputX, &OutputX, &SetpointX, Kp, Ki, Kd, DIRECT);
 PID pidy(&InputY, &OutputY, &SetpointY, Kp, Ki, Kd, DIRECT);
 int valuesPot1[araryNum] ;
@@ -144,10 +145,10 @@ void setup() {
   pinMode(BUTTONB, INPUT);
   pinMode(BUTTONC, INPUT);
   pinMode(BUTTOND, INPUT);
-  digitalWrite(BUTTONA,HIGH);
-  digitalWrite(BUTTONB,HIGH);
-  digitalWrite(BUTTONC,HIGH);
-  digitalWrite(BUTTOND,HIGH);
+  digitalWrite(BUTTONA, HIGH);
+  digitalWrite(BUTTONB, HIGH);
+  digitalWrite(BUTTONC, HIGH);
+  digitalWrite(BUTTOND, HIGH);
   pinMode(POT1, INPUT);
   pinMode(POT2, INPUT);
 
@@ -157,8 +158,8 @@ void setup() {
   motory.attach(MOTOR2);
   pidx.SetMode(AUTOMATIC);
   pidy.SetMode(AUTOMATIC);
-  pidx.SetOutputLimits(0, 180);
-  pidy.SetOutputLimits(0, 180);
+  pidx.SetOutputLimits(-90, 90);
+  pidy.SetOutputLimits(-90, 90);
   Serial.println("SETUP IS DONE");
 }
 
@@ -195,15 +196,15 @@ void loop() {
   }
 
 
-  InputX = average(valuesPot1, araryNum, 3, false);
-  InputY = average(valuesPot2, araryNum, 3, false);
+  InputX = map(analogRead(POT1) + offset2, 0, 1023, 0, 100);;
+  InputY = map(analogRead(POT2) + offset2, 0, 1023, 0, 100);;
 
   SensorA = (average(valuesA, araryNum, averageAmount, true) < 40) ? true : false;
   SensorB = (average(valuesB, araryNum, averageAmount, true) < 40) ? true : false;
   SensorC = (average(valuesC, araryNum, averageAmount, true) < 40) ? true : false;
   SensorD = (average(valuesD, araryNum, averageAmount, true) < 40) ? true : false;
-  sensors[0] = average(valuesA, araryNum, averageAmount, true);
-  sensors[1] = average(valuesB, araryNum, averageAmount, true);
+  sensors[0] = InputX;
+  sensors[1] = InputY;
   sensors[2] = average(valuesC, araryNum, averageAmount, true);
   sensors[3] = average(valuesD, araryNum, averageAmount, true);
   Print(sensors, 4);
@@ -373,8 +374,10 @@ void loop() {
   };
   pidx.Compute();
   pidy.Compute();
-  motorx.write(OutputX);
-  motory.write(OutputY);
+  motorx.write(OutputX + 90);
+  motory.write(OutputY + 90);
+  Serial.println(OutputX + 90);
+  Serial.println(OutputY + 90);
   timeout += 100;
 
 }
