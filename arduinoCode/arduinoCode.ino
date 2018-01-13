@@ -94,8 +94,12 @@ int formatData(int data) {
 #define MOTOR2 9
 // array information
 #define araryNum 50
-#define averageAmount 20
+#define averageAmount 5
 #define DELAYMAX 50
+#define BUTTONA 4
+#define BUTTONB 5
+#define BUTTONC 6
+#define BUTTOND 7
 // Ultrasonic Sensors
 HCSR04 RawA(TRIG_PIN_1, ECHO_PIN_1, 20, 1000);
 HCSR04 RawB(TRIG_PIN_2, ECHO_PIN_2, 20, 1000);
@@ -125,16 +129,28 @@ int offset1 = 0;
 int offset2 = 0;
 int delaynum = 0;
 
+bool buttons = true;
+
 
 Servo motorx;
 Servo motory;
 
 String inputString  = "";
 void setup() {
-  for(int i = 0; i<10;i++){
-    pinMode(i,OUTPUT);
-  }
-  
+
+  pinMode(ECHO_PIN_1, INPUT);
+  pinMode(ECHO_PIN_2, INPUT);
+  pinMode(BUTTONA, INPUT);
+  pinMode(BUTTONB, INPUT);
+  pinMode(BUTTONC, INPUT);
+  pinMode(BUTTOND, INPUT);
+  digitalWrite(BUTTONA,HIGH);
+  digitalWrite(BUTTONB,HIGH);
+  digitalWrite(BUTTONC,HIGH);
+  digitalWrite(BUTTOND,HIGH);
+  pinMode(POT1, INPUT);
+  pinMode(POT2, INPUT);
+
   Serial.begin(9600);
   changeState(1);
   motorx.attach(MOTOR1);
@@ -147,20 +163,41 @@ void setup() {
 }
 
 void loop() {
+
+
   roll(valuesA, valuesA, araryNum, false);
-  valuesA[araryNum - 1] = formatData(RawA.distanceInMillimeters());
+  if (buttons) {
+    valuesA[araryNum - 1] = digitalRead(BUTTONA) ? 1000 : 30;
+  }
+  else {
+    valuesA[araryNum - 1] = formatData(RawA.distanceInMillimeters());
+  }
+
   delay(50);
   roll(valuesB, valuesB, araryNum, false);
-  valuesB[araryNum - 1] = formatData(RawB.distanceInMillimeters());
+  if (buttons) {
+    valuesB[araryNum - 1] = digitalRead(BUTTONB) ? 1000 : 30;
+  }
+  else {
+    valuesB[araryNum - 1] = formatData(RawB.distanceInMillimeters());
+  }
   delay(50);
   roll(valuesPot1, valuesPot1, araryNum, false);
   valuesPot1[araryNum - 1] = map(analogRead(POT1) + offset1, 0, 1023, 0, 100);
   roll(valuesPot2, valuesPot2, araryNum, false);
   valuesPot2[araryNum - 1] = map(analogRead(POT2) + offset2, 0, 1023, 0, 100);
 
+  if (buttons) {
+    roll(valuesC, valuesC, araryNum, false);
+    roll(valuesD, valuesD, araryNum, false);
+    valuesC[araryNum - 1] = digitalRead(BUTTONC) ? 1000 : 30;
+    valuesD[araryNum - 1] = digitalRead(BUTTOND) ? 1000 : 30;
+  }
+
+
   InputX = average(valuesPot1, araryNum, 3, false);
   InputY = average(valuesPot2, araryNum, 3, false);
-  
+
   SensorA = (average(valuesA, araryNum, averageAmount, true) < 40) ? true : false;
   SensorB = (average(valuesB, araryNum, averageAmount, true) < 40) ? true : false;
   SensorC = (average(valuesC, araryNum, averageAmount, true) < 40) ? true : false;
@@ -194,7 +231,9 @@ void loop() {
       Serial.println("State 2");
       SetpointX = 75;
       SetpointY = 25;
-      if (timeout > timeout_amount) {changeState(1);}
+      if (timeout > timeout_amount) {
+        changeState(1);
+      }
       if (SensorA) {
         changeState(3);
       }
